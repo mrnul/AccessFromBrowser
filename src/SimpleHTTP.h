@@ -1,11 +1,15 @@
 #pragma once
+
 #include <string>
 #include <unordered_map>
+#include <Shlwapi.h>
 
 using std::string;
 using std::wstring;
 using std::unordered_map;
 using std::to_string;
+
+#pragma comment(lib, "Shlwapi.lib")
 
 namespace simplehttp
 {
@@ -14,14 +18,19 @@ namespace simplehttp
 		NONE, OTHER, OK, NOT_FOUND
 	};
 
-	enum class ConentType
+	enum class ContentType
 	{
-		NONE, OTHER, TEXT_PLAIN, TEXT_HTML, IMAGE_JPEG, IMAGE_PNG
+		NONE, OTHER, TEXT_PLAIN, TEXT_HTML, IMAGE_JPEG, IMAGE_PNG, IMAGE_GIF
 	};
 
 	enum class Connection
 	{
 		NONE, OTHER, CLOSE, KEEP_ALIVE
+	};
+
+	enum class ContentDisposition
+	{
+		NONE, OTHER, ATTACHMENT, INLINE
 	};
 
 	namespace mapping
@@ -34,14 +43,23 @@ namespace simplehttp
 			{Status::NOT_FOUND, "HTTP/1.1 404 Not Found\r\n"}
 		};
 
-		const unordered_map<ConentType, string> ContentTypeMap =
+		const unordered_map<ContentType, string> ContentTypeMap =
 		{
-			{ConentType::NONE, ""},
-			{ConentType::OTHER, ""},
-			{ConentType::TEXT_PLAIN, "Conent-Type: text/plain; charset=utf-8\r\n"},
-			{ConentType::TEXT_HTML, "Conent-Type: text/html; charset=utf-8\r\n"},
-			{ConentType::IMAGE_JPEG, "Conent-Type: image/jpeg\r\n"},
-			{ConentType::IMAGE_PNG, "Conent-Type: image/png\r\n"}
+			{ContentType::NONE, ""},
+			{ContentType::OTHER, ""},
+			{ContentType::TEXT_PLAIN, "Conent-Type: text/plain; charset=utf-8\r\n"},
+			{ContentType::TEXT_HTML, "Conent-Type: text/html; charset=utf-8\r\n"},
+			{ContentType::IMAGE_JPEG, "Conent-Type: image/jpeg\r\n"},
+			{ContentType::IMAGE_PNG, "Conent-Type: image/png\r\n"},
+			{ContentType::IMAGE_GIF, "Conent-Type: image/gif\r\n"}
+		};
+
+		const unordered_map<ContentDisposition, string> ContentDispositionMap =
+		{
+			{ContentDisposition::NONE, ""},
+			{ContentDisposition::OTHER, ""},
+			{ContentDisposition::ATTACHMENT, "Content-Disposition: attachment\r\n"},
+			{ContentDisposition::INLINE, "Content-Disposition: inline\r\n"}
 		};
 
 		const unordered_map<Connection, string> ConnectionTypeMap
@@ -58,17 +76,15 @@ class SimpleHTTP
 {
 private:
 	simplehttp::Status Status;
-	simplehttp::ConentType ContentType;
+	simplehttp::ContentType ContentType;
+	simplehttp::ContentDisposition ContentDisposition;
 	simplehttp::Connection Connection;
 	int ContentLength;
 
 public:
 	SimpleHTTP()
 	{
-		Status = simplehttp::Status::NONE;
-		ContentType = simplehttp::ConentType::NONE;
-		Connection = simplehttp::Connection::NONE;
-		ContentLength = -1;
+		Clear();
 	}
 
 	void SetStatus(simplehttp::Status status)
@@ -79,9 +95,13 @@ public:
 	{
 		Connection = connection;
 	}
-	void SetContentType(simplehttp::ConentType type)
+	void SetContentType(simplehttp::ContentType type)
 	{
 		ContentType = type;
+	}
+	void SetContentDisposition(simplehttp::ContentDisposition content)
+	{
+		ContentDisposition = content;
 	}
 	void SetContentLength(int length)
 	{
@@ -95,6 +115,7 @@ public:
 
 		string res =
 			simplehttp::mapping::StatusMap.at(Status) +
+			simplehttp::mapping::ContentDispositionMap.at(ContentDisposition) +
 			simplehttp::mapping::ConnectionTypeMap.at(Connection) +
 			simplehttp::mapping::ContentTypeMap.at(ContentType);
 
@@ -105,6 +126,15 @@ public:
 
 		res += "\r\n";
 		return res;
+	}
+
+	void Clear()
+	{
+		Status = simplehttp::Status::NONE;
+		ContentType = simplehttp::ContentType::NONE;
+		Connection = simplehttp::Connection::NONE;
+		ContentDisposition = simplehttp::ContentDisposition::NONE;
+		ContentLength = -1;
 	}
 
 	wstring static ExtractFileOrDirectoryFromRequest(const string request)
@@ -124,19 +154,16 @@ public:
 		if (count < 0)
 			return wstring(L"");
 
-		wstring ret = L"";
-		for (int i = 0; i < count; i++)
-		{
-			ret += request[i + offset];
-		}
-
-		return ret;
+		wstring res = wstring(request.begin() + offset, request.begin() + offset + count);
+		wstring unescaped(1024 * 1024, 0);
+		DWORD size = unescaped.size();
+		return UrlUnescapeW(res.data(), unescaped.data(), &size, URL_UNESCAPE_AS_UTF8) == S_OK ? wstring(unescaped.begin(), unescaped.begin() + size) : wstring(L"");
 	}
 
 	bool static Is_Complete(const string request)
 	{
 		const string REQUEST_END = "\r\n\r\n";
 		return (request.substr(request.size() - REQUEST_END.length(), REQUEST_END.length()) == REQUEST_END);
-		
+
 	}
 };
