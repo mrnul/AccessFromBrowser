@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include <MyHeaders/SocketClient.h>
+#include "SocketClient.h"
 
 using std::wstring;
 constexpr unsigned int BUFFER_SZ = 1024 * 128; // 128 KB

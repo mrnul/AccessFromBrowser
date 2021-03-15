@@ -37,7 +37,7 @@ bool HandleRequest(SocketClient& cl, const wstring path)
 		html.SetTitle(L"Hmmm...");
 		html.SetGeneralMessage(L"ERROR 404: Content not found");
 
-		const string res = wstring_to_utf8(html.GetHTML());
+		const string res = wstring_to_utf8(html.BuildHTML());
 		data.insert(data.end(), res.begin(), res.begin() + res.size());
 	}
 	else if (path.length() == 0)
@@ -56,7 +56,7 @@ bool HandleRequest(SocketClient& cl, const wstring path)
 		}
 		html.SetTitle(L"Access From PC home page");
 		http.SetContentType(simplehttp::ContentType::TEXT_HTML);
-		const string res = wstring_to_utf8(html.GetHTML());
+		const string res = wstring_to_utf8(html.BuildHTML());
 		data.insert(data.end(), res.begin(), res.begin() + res.size());
 	}
 	else if (std::filesystem::is_directory(p))
@@ -68,7 +68,7 @@ bool HandleRequest(SocketClient& cl, const wstring path)
 		{
 			entry.is_directory() ? html.AddLinkDirectory(entry.path().wstring()) : html.AddLinkDownloadable(entry.path().wstring());
 		}
-		const string res = wstring_to_utf8(html.GetHTML());
+		const string res = wstring_to_utf8(html.BuildHTML());
 		data.insert(data.end(), res.begin(), res.begin() + res.size());
 	}
 	else
@@ -116,7 +116,7 @@ bool HandleRequest(SocketClient& cl, const wstring path)
 	http.SetConnection(simplehttp::Connection::KEEP_ALIVE);
 	http.SetContentLength(data.size());
 
-	const string response = http.GetHTTPResponse();
+	const string response = http.BuildHTTPResponse();
 	if (response.size() == 0)
 		return false;
 
@@ -126,7 +126,7 @@ bool HandleRequest(SocketClient& cl, const wstring path)
 	return cl.Send(data.data(), data.size()) == data.size();
 }
 
-void WCout(const wstring str)
+void ConsoleOut(const wstring str)
 {
 	wcout << str << endl;
 }
@@ -135,25 +135,44 @@ void WCout(const wstring str)
 void ClientThread(const SOCKET socket, const wstring IP)
 {
 	SocketClient client(socket);
-	string httpRequest = "";
-	WCout(L"New client: " + IP);
+	ConsoleOut(L"New client: " + IP);
 	while (true)
 	{
-		vector<char> buffer(BUFFER_SZ, 0);
-
-		if (client.Recieve(buffer.data(), BUFFER_SZ - 1) <= 0)
+		const SimpleHTTPResult res = SimpleHTTP::ReceiveHTTPFromClient(client);
+		if (res.Method == simplehttp::Method::NONE)
 			break;
 
-		httpRequest += buffer.data();
-		if (SimpleHTTP::Is_Complete(httpRequest))
+		const string& fristLine = res.HTTP.substr(0, res.HTTP.find("\r\n"));
+		ConsoleOut(IP + L"\t" + wstring(fristLine.begin(), fristLine.end()));
+
+		if (res.Method == simplehttp::Method::GET)
 		{
-			const wstring fod = SimpleHTTP::ExtractFileOrDirectoryFromRequest(httpRequest);
-
-			if (!HandleRequest(client, fod))
+			if (!HandleRequest(client, res.FileName))
 				HandleRequest(client, NOT_FOUND);
+		}
+		else if (res.Method == simplehttp::Method::POST)
+		{
+			vector<char> buffer(res.ContentLength);
+			const int count = client.RecieveNBytes(buffer.data(), res.ContentLength);;
 
-			httpRequest.clear();
+			SimpleHTTPPostDataResult postData = SimpleHTTP::ExtractHTTPPostData(buffer, res.Boundary);
+
+			if (postData.Count > 0)
+			{
+				std::ofstream out(postData.Filename, std::ios_base::trunc | std::ios_base::binary);
+				out.write(buffer.data() + postData.DataBegin, postData.Count);
+				HandleRequest(client, L"");
+			}
+			else
+			{
+				HandleRequest(client, NOT_FOUND);
+			}
+		}
+		else if (res.Method == simplehttp::Method::PUT)
+		{
+			client.DiscardNBytes(res.ContentLength);
+			HandleRequest(client, NOT_FOUND);
 		}
 	}
-	WCout(L"Disconnected: " + IP);
+	ConsoleOut(L"Disconnected: " + IP);
 }
