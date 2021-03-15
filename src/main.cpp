@@ -24,13 +24,13 @@ int main()
 
 	if (!server.CreateAndBind(IP, httpPort))
 	{
-		wcout << "Error in CreateAndBind. Get_Last_Error returned " << GetLastError() << endl;
+		wcout << "Error in CreateAndBind" << endl;
 		return -2;
 	}
 
 	if (!server.Listen())
 	{
-		wcout << "Error in Listen. Get_Last_Error returned " << GetLastError() << endl;
+		wcout << "Error in Listen" << endl;
 		return -3;
 	}
 
