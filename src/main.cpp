@@ -1,4 +1,4 @@
-#include <MyHeaders/SocketServer.h>
+#include "SocketServer.h"
 #include <iostream>
 #include <thread>
 #include <string>
@@ -35,7 +35,7 @@ int main()
 	}
 
 	wcout << "Waiting for client on: " << IP << endl;
-	
+
 	while (true)
 	{
 		SOCKET socket = server.Accept(IP);
