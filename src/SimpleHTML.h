@@ -80,7 +80,8 @@ public:
 			}
 		}
 
-		ret += L"<br><br><form id=\"uploadbanner\" enctype=\"multipart/form-data\" method=\"post\" action=\"#\">\r\n";
+		ret += L"<p>Send something to PC</p>\r\n";
+		ret += L"<form id=\"uploadbanner\" enctype=\"multipart/form-data\" method=\"post\" action=\"#\">\r\n";
 		ret += L"<input id=\"fileupload\" name=\"myfile\" type = \"file\" />\r\n";
 		ret += L"<input type=\"submit\" value=\"Send\" id=\"submit\" />\r\n";
 		ret += L"</form>\r\n";
