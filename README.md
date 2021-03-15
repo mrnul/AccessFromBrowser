@@ -13,4 +13,4 @@ The home page consists of connected drives on PC (ex. C:\\, D:\\) [screenshot](h
 By clicking on a drive you can see the content of that drive [screenshot](https://github.com/mrnul/AccessFromBrowser/blob/main/screenshots/content.png "Example of content")
 
 # Upload files to PC
-Click browser button, select a file, and lick on send button
+Click Browse... button, select a file, and lick on Send button
