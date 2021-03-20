@@ -108,14 +108,14 @@ namespace simplehttp
 
 struct SimpleHTTPResult
 {
-	wstring FileName;
+	string FileName;
 	string HTTP;
 	string Boundary;
 	simplehttp::Method Method;
 	int ContentLength;
 	SimpleHTTPResult()
 	{
-		FileName = wstring();
+		FileName = string();
 		HTTP = string();
 		Boundary = string();
 		Method = simplehttp::Method::NONE;
@@ -128,12 +128,12 @@ struct SimpleHTTPPostDataResult
 	int DataBegin;
 	int DataEnd;
 	int Count;
-	wstring Filename;
+	string Filename;
 	SimpleHTTPPostDataResult()
 	{
 		DataBegin = DataEnd = -1;
 		Count = 0;
-		Filename = wstring();
+		Filename = string();
 	}
 };
 
@@ -248,7 +248,7 @@ public:
 			res.Method = simplehttp::Method::OTHER;
 		}
 
-		wstring tmp;
+		
 
 		if (res.Method == simplehttp::Method::POST)
 		{
@@ -258,7 +258,7 @@ public:
 				const int begin = contentLengthPos + simplehttp::mapping::FieldMap.at(simplehttp::Field::CONTENT_LENGTH).size();
 				const int end = contentLengthPos + http.substr(contentLengthPos).find("\r\n");
 				if (begin < end)
-					res.ContentLength = stoi(wstring(http.begin() + begin, http.begin() + end));
+					res.ContentLength = stoi(string(http.begin() + begin, http.begin() + end));
 			}
 			const int contentTypePos = http.find(simplehttp::mapping::FieldMap.at(simplehttp::Field::CONTENT_TYPE));
 			if (contentTypePos != string::npos)
@@ -272,12 +272,20 @@ public:
 		}
 		else if (res.Method == simplehttp::Method::GET)
 		{
-			wstring unescaped(1024 * 1024, 0);
-			DWORD size = unescaped.size();
-			tmp = wstring(http.begin() + simplehttp::mapping::MethodMap.at(res.Method).size(),
+			wstring wun(BUFFER_SZ, 0);
+			string un(BUFFER_SZ, 0);
+			DWORD size = wun.size();
+			string fileStr = string(http.begin() + simplehttp::mapping::MethodMap.at(res.Method).size(),
 				http.begin() + http.find(simplehttp::mapping::MethodMap.at(simplehttp::Method::HTTP)));
+			wstring fileWstr(BUFFER_SZ, 0);
 
-			res.FileName = UrlUnescapeW(tmp.data(), unescaped.data(), &size, URL_UNESCAPE_AS_UTF8) == S_OK ? wstring(unescaped.begin(), unescaped.begin() + size) : wstring(L"");
+			int count = MultiByteToWideChar(CP_UTF8, 0, fileStr.data(), fileStr.size(), fileWstr.data(), BUFFER_SZ - 1);
+			const HRESULT hres = UrlUnescapeW(fileWstr.data(), wun.data(), &size, URL_UNESCAPE_AS_UTF8);
+			if (hres == S_OK)
+			{
+				count = WideCharToMultiByte(CP_UTF8, 0, wun.data(), size, un.data(), BUFFER_SZ - 1, 0, 0);
+				res.FileName = (count > 0 ? string(un.begin(), un.begin() + count) : "");
+			}
 		}
 		return res;
 	}
@@ -306,7 +314,7 @@ public:
 		if (nameStart >= nameEnd)
 			return SimpleHTTPPostDataResult();
 
-		res.Filename = wstring(data.begin() + nameStart, data.begin() + nameEnd);
+		res.Filename = string(data.begin() + nameStart, data.begin() + nameEnd);
 		res.DataBegin = std::distance(data.begin(), dataStartIt) + dataStart.size();
 		res.DataEnd = std::distance(data.begin(), boundaryEndIt) - 2; // ignore \r\n
 

@@ -26,11 +26,11 @@ private:
 public:
 	SocketServer();
 	bool Init();
-	bool CreateAndBind(const wchar_t* host, const wchar_t* port);
-	bool GetLocalMachineIP(wchar_t* ip) const; //it just returns the last address found
-	bool GetClientAddress(SOCKET client, wchar_t* address) const;
+	bool CreateAndBind(const char* host, const char* port);
+	bool GetLocalMachineIP(char* ip) const; //it just returns the last address found
+	bool GetClientAddressName(SOCKET client, char* address = 0, char* name = 0, char* port = 0) const;
 	bool Listen();
-	SOCKET Accept(wchar_t* IP = 0) const;
+	SOCKET Accept(char* address = 0, char* name = 0, char* port = 0) const;
 	bool IsInitialized() const;
 	bool SetNonBlocking(const bool nonBlocking) const;
 	bool CheckReadability(const long int secs = 0, const long int microsecs = 0) const;

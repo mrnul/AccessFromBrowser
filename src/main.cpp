@@ -12,8 +12,8 @@ using std::wstring;
 
 int main()
 {
-	const TCHAR httpPort[] = L"80";
-	TCHAR IP[256] = {};
+	const char httpPort[] = "80";
+	char IP[512] = {};
 
 	SocketServer server;
 	if (!server.GetLocalMachineIP(IP))
@@ -41,7 +41,7 @@ int main()
 		SOCKET socket = server.Accept(IP);
 		if (socket != INVALID_SOCKET)
 		{
-			thread(ClientThread, socket, wstring(IP)).detach();
+			thread(ClientThread, socket, string(IP)).detach();
 		}
 	}
 }

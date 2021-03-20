@@ -8,45 +8,47 @@
 #include "SimpleHTTP.h"
 #include "SimpleHTML.h"
 
-using std::wcout;
 using std::cout;
 using std::endl;
 using std::vector;
 using std::string;
-using std::wstring;
 using std::ifstream;
 using std::to_string;
 
-string wstring_to_utf8(const std::wstring& str)
+string string_to_utf8(const std::string& str)
 {
-	vector<char> multibytestr(BUFFER_SZ, 0);
-	const int count = WideCharToMultiByte(CP_UTF8, WC_NO_BEST_FIT_CHARS, str.data(), str.length(), multibytestr.data(), multibytestr.size() - 1, 0, 0);
-	return string(multibytestr.begin(), multibytestr.begin() + count);
+	vector<wchar_t> widestr(BUFFER_SZ, 0);
+	int count = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.size(), widestr.data(), BUFFER_SZ - 1);
+	if (!count)
+		return "";
+	vector<char> multibyte(BUFFER_SZ, 0);
+	count = WideCharToMultiByte(CP_UTF8, 0, widestr.data(), count, multibyte.data(), BUFFER_SZ - 1, 0, 0);
+	return string(multibyte.begin(), multibyte.begin() + count);
 }
 
-bool HandleRequest(SocketClient& cl, const wstring path)
+bool HandleRequest(SocketClient& cl, const string path)
 {
 	SimpleHTTP http;
 	SimpleHTML html;
 	vector<char> data;
 
-	std::filesystem::path p = path;
+	std::filesystem::path p = std::filesystem::u8path(path);
 	if (path == NOT_FOUND)
 	{
 		http.SetContentType(simplehttp::ContentType::TEXT_HTML);
-		html.SetTitle(L"Hmmm...");
-		html.SetGeneralMessage(L"ERROR 404: Content not found");
+		html.SetTitle("Hmmm...");
+		html.SetGeneralMessage("ERROR 404: Content not found");
 
-		const string res = wstring_to_utf8(html.BuildHTML());
+		const string res = string_to_utf8(html.BuildHTML());
 		data.insert(data.end(), res.begin(), res.begin() + res.size());
 	}
 	else if (path.length() == 0)
 	{
-		vector<wchar_t> letters(BUFFER_SZ, 0);
-		const unsigned int resSize = (unsigned int)GetLogicalDriveStringsW(BUFFER_SZ - 2, letters.data());
+		vector<char> letters(BUFFER_SZ, 0);
+		const unsigned int resSize = (unsigned int)GetLogicalDriveStringsA(BUFFER_SZ - 2, letters.data());
 		for (unsigned int i = 0; i < resSize; i++)
 		{
-			wstring tmp = wstring();
+			string tmp = string();
 			while (letters[i] != L'\0')
 			{
 				tmp.push_back(letters[i]);
@@ -54,26 +56,33 @@ bool HandleRequest(SocketClient& cl, const wstring path)
 			}
 			html.AddLinkDirectory(tmp);
 		}
-		html.SetTitle(L"Access From PC home page");
+		html.SetTitle("Access From PC home page");
 		http.SetContentType(simplehttp::ContentType::TEXT_HTML);
-		const string res = wstring_to_utf8(html.BuildHTML());
+		const string res = string_to_utf8(html.BuildHTML());
 		data.insert(data.end(), res.begin(), res.begin() + res.size());
 	}
 	else if (std::filesystem::is_directory(p))
 	{
-		html.SetTitle(L"Contents");
+		html.SetTitle("Contents");
 		http.SetContentType(simplehttp::ContentType::TEXT_HTML);
 
-		for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(p, std::filesystem::directory_options::skip_permission_denied))
+		try
 		{
-			entry.is_directory() ? html.AddLinkDirectory(entry.path().wstring()) : html.AddLinkDownloadable(entry.path().wstring());
+			for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(p, std::filesystem::directory_options::skip_permission_denied))
+			{
+				entry.is_directory() ? html.AddLinkDirectory(entry.path().u8string()) : html.AddLinkDownloadable(entry.path().u8string());
+			}
+			const string res = string_to_utf8(html.BuildHTML());
+			data.insert(data.end(), res.begin(), res.begin() + res.size());
 		}
-		const string res = wstring_to_utf8(html.BuildHTML());
-		data.insert(data.end(), res.begin(), res.begin() + res.size());
+		catch (...)
+		{
+
+		}
 	}
 	else
 	{
-		ifstream input(path, std::ios_base::binary);
+		ifstream input(p, std::ios_base::binary);
 		if (!input.is_open())
 			return false;
 
@@ -84,30 +93,34 @@ bool HandleRequest(SocketClient& cl, const wstring path)
 			data.insert(data.end(), buffer.begin(), buffer.begin() + (unsigned int)input.gcount());
 		}
 
-		const wstring ext = p.extension().wstring();
-		if (ext == L".jpg" || ext == L".jpeg")
+		const string ext = p.extension().string();
+		if (_stricmp(ext.c_str(), ".jpg") == 0 || _stricmp(ext.c_str(), ".jpeg") == 0)
 		{
 			http.SetContentType(simplehttp::ContentType::IMAGE_JPEG);
 			http.SetContentDisposition(simplehttp::ContentDisposition::INLINE);
 		}
-		else if (ext == L".gif")
+		else if (_stricmp(ext.c_str(), ".gif") == 0)
 		{
 			http.SetContentType(simplehttp::ContentType::IMAGE_GIF);
 			http.SetContentDisposition(simplehttp::ContentDisposition::INLINE);
 		}
-		else if (ext == L".png")
+		else if (_stricmp(ext.c_str(), ".png") == 0)
 		{
 			http.SetContentType(simplehttp::ContentType::IMAGE_PNG);
 			http.SetContentDisposition(simplehttp::ContentDisposition::INLINE);
 
 		}
-		else if (ext == L".html")
+		else if (_stricmp(ext.c_str(), ".html") == 0)
 		{
 			http.SetContentType(simplehttp::ContentType::TEXT_HTML);
 		}
-		else
+		else if(_stricmp(ext.c_str(), ".txt") == 0)
 		{
 			http.SetContentType(simplehttp::ContentType::TEXT_PLAIN);
+			http.SetContentDisposition(simplehttp::ContentDisposition::INLINE);
+		}
+		else
+		{
 			http.SetContentDisposition(simplehttp::ContentDisposition::INLINE);
 		}
 	}
@@ -126,16 +139,16 @@ bool HandleRequest(SocketClient& cl, const wstring path)
 	return cl.Send(data.data(), data.size()) == data.size();
 }
 
-void ConsoleOut(const wstring str)
+void ConsoleOut(const string str)
 {
-	wcout << str << endl;
+	cout << str << endl;
 }
 
 
-void ClientThread(const SOCKET socket, const wstring IP)
+void ClientThread(const SOCKET socket, const string IP)
 {
 	SocketClient client(socket);
-	ConsoleOut(L"New client: " + IP);
+	ConsoleOut("New client: " + IP);
 	while (true)
 	{
 		const SimpleHTTPResult res = SimpleHTTP::ReceiveHTTPFromClient(client);
@@ -143,7 +156,7 @@ void ClientThread(const SOCKET socket, const wstring IP)
 			break;
 
 		const string& fristLine = res.HTTP.substr(0, res.HTTP.find("\r\n"));
-		ConsoleOut(IP + L"\t" + wstring(fristLine.begin(), fristLine.end()));
+		ConsoleOut(IP + "\t" + string(fristLine.begin(), fristLine.end()));
 
 		if (res.Method == simplehttp::Method::GET)
 		{
@@ -161,7 +174,7 @@ void ClientThread(const SOCKET socket, const wstring IP)
 			{
 				std::ofstream out(postData.Filename, std::ios_base::trunc | std::ios_base::binary);
 				out.write(buffer.data() + postData.DataBegin, postData.Count);
-				HandleRequest(client, L"");
+				HandleRequest(client, "");
 			}
 			else
 			{
@@ -174,5 +187,5 @@ void ClientThread(const SOCKET socket, const wstring IP)
 			HandleRequest(client, NOT_FOUND);
 		}
 	}
-	ConsoleOut(L"Disconnected: " + IP);
+	ConsoleOut("Disconnected: " + IP);
 }

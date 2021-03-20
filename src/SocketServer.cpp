@@ -13,18 +13,18 @@ bool SocketServer::Init()
 	return Initialized;
 }
 
-bool SocketServer::CreateAndBind(const wchar_t* host, const wchar_t* port)
+bool SocketServer::CreateAndBind(const char* host, const char* port)
 {
-	ADDRINFOW hints = {};
-	ADDRINFOW* res;
+	ADDRINFOA hints = {};
+	ADDRINFOA* res;
 
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 	hints.ai_protocol = IPPROTO_TCP;
 
-	if (GetAddrInfoW(host, port, &hints, &res) != 0)
+	if (GetAddrInfoA(host, port, &hints, &res) != 0)
 	{
-		FreeAddrInfoW(res);
+		FreeAddrInfoA(res);
 		return false;
 	}
 
@@ -33,22 +33,22 @@ bool SocketServer::CreateAndBind(const wchar_t* host, const wchar_t* port)
 	if (Socket == INVALID_SOCKET)
 	{
 		Socket = 0;
-		FreeAddrInfoW(res);
+		FreeAddrInfoA(res);
 		return false;
 	}
 
 	if (bind(Socket, res->ai_addr, res->ai_addrlen) == SOCKET_ERROR)
 	{
 		Close();
-		FreeAddrInfoW(res);
+		FreeAddrInfoA(res);
 		return false;
 	}
 
-	FreeAddrInfoW(res);
+	FreeAddrInfoA(res);
 	return true;
 }
 
-bool SocketServer::GetLocalMachineIP(wchar_t* ip) const
+bool SocketServer::GetLocalMachineIP(char* ip) const
 {
 	wchar_t hostname[512] = {};
 
@@ -66,23 +66,35 @@ bool SocketServer::GetLocalMachineIP(wchar_t* ip) const
 	for (ADDRINFOW* ptr = result; ptr != 0; ptr = ptr->ai_next)
 	{
 		SOCKADDR_IN* tmp = (SOCKADDR_IN*)ptr->ai_addr;
-		if (InetNtopW(AF_INET, &tmp->sin_addr, ip, 512) == 0)
+		if (inet_ntop(AF_INET, &tmp->sin_addr, ip, 512) == 0)
 			return false;
 	}
 
 	return true;
 }
 
-bool SocketServer::GetClientAddress(SOCKET client, wchar_t* address) const
+bool SocketServer::GetClientAddressName(SOCKET client, char* address, char* name, char* port) const
 {
 	SOCKADDR_IN addr1 = {};
 	int len1 = sizeof(addr1);
-	if (getpeername(client, (SOCKADDR*)&addr1, &len1) != 0)
-		return false;
+	bool allOK = true;
 
-	if (InetNtop(AF_INET, &addr1.sin_addr, address, 512) == 0)
-		return false;
-	return true;
+	if (getpeername(client, (SOCKADDR*)&addr1, &len1) != 0)
+		allOK = false;
+
+	if (address)
+	{
+		if (inet_ntop(AF_INET, &addr1.sin_addr, address, 512) == 0)
+			allOK = false;
+	}
+
+	if (name || port)
+	{
+		if (getnameinfo((SOCKADDR*)&addr1, sizeof(addr1), name, 512, port, 512, 0) != 0)
+			allOK = false;
+	}
+
+	return allOK;
 }
 
 bool SocketServer::Listen()
@@ -95,7 +107,7 @@ bool SocketServer::Listen()
 	return true;
 }
 
-SOCKET SocketServer::Accept(wchar_t* IP) const
+SOCKET SocketServer::Accept(char* address, char* name, char* port) const
 {
 	SOCKADDR_IN addr = {};
 	int len = sizeof(addr);
@@ -104,8 +116,7 @@ SOCKET SocketServer::Accept(wchar_t* IP) const
 	if (res == SOCKET_ERROR)
 		return 0;
 
-	if (IP)
-		InetNtopW(AF_INET, &addr.sin_addr, IP, 512);
+	GetClientAddressName(res, address, name, port);
 
 	return res;
 }
