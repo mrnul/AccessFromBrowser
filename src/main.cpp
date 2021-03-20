@@ -5,10 +5,9 @@
 
 #include "ClientThread.h"
 
-using std::wcout;
+using std::cout;
 using std::endl;
 using std::thread;
-using std::wstring;
 
 int main()
 {
@@ -18,23 +17,23 @@ int main()
 	SocketServer server;
 	if (!server.GetLocalMachineIP(IP))
 	{
-		wcout << "Could not get local IP" << endl;
+		cout << "Could not get local IP" << endl;
 		return -1;
 	}
 
 	if (!server.CreateAndBind(IP, httpPort))
 	{
-		wcout << "Error in CreateAndBind" << endl;
+		cout << "Error in CreateAndBind" << endl;
 		return -2;
 	}
 
 	if (!server.Listen())
 	{
-		wcout << "Error in Listen" << endl;
+		cout << "Error in Listen" << endl;
 		return -3;
 	}
 
-	wcout << "Waiting for client on: " << IP << endl;
+	cout << "Waiting for client on: " << IP << endl;
 
 	while (true)
 	{
